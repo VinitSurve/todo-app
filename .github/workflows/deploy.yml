@@ -1,0 +1,78 @@
+name: Deploy to EC2
+
+on:
+  push:
+    branches:
+      - main
+
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Checkout Repo
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # 2. Setup Node (important for consistency)
+      - name: Setup node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+
+      # 3. Install dependencies (deterministic)
+      - name: Install backend dependencies
+        run: |
+           cd backend
+           npm ci
+
+      # 4. Secruity Check (Non-blocking)
+      - name: Secruity audit
+        run: |
+          cd backend
+          npm audit --production || true
+
+      # 5. Runtime Check
+      - name: Check app boots
+        run: |
+           node backend/index.js &
+           sleep 5
+           kill $!
+      # 6. Deploy to EC2 via SSH
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            set -e
+
+            echo "📦 Navigating to project"
+            cd ~/todo-app
+
+            echo "🔄 Pulling latest code"
+            git pull origin main
+
+            echo "📥 Installing dependencies (clean)"
+            cd backend
+            npm ci
+
+            echo "🔁 Restarting backend"
+            pm2 restart todo-app || pm2 start index.js --name todo-app
+            pm2 save
+
+            echo "🧪 Testing Nginx config"
+            sudo nginx -t
+
+            echo "🔁 Reloading Nginx"
+            sudo systemctl reload nginx
+
+            echo "⏳ Waiting for app to stabilize"
+            sleep 5
+
+            echo "🔍 Running health check"
+            curl -f http://localhost:3000/api/health || exit 1
+
+            echo "✅ Deployment successful"
