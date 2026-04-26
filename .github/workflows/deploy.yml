@@ -9,21 +9,6 @@ jobs:
   build-test:
     runs-on: ubuntu-latest
 
-    services:
-      postgres:
-        image: postgres:15
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: todo
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd="pg_isready -U postgres"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=5
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -38,38 +23,12 @@ jobs:
           cd backend
           npm ci
 
-      - name: Set environment variables
-        run: |
-          echo "DB_HOST=localhost" >> $GITHUB_ENV
-          echo "DB_PORT=5432" >> $GITHUB_ENV
-          echo "DB_USER=postgres" >> $GITHUB_ENV
-          echo "DB_PASSWORD=postgres" >> $GITHUB_ENV
-          echo "DB_NAME=todo" >> $GITHUB_ENV
-
-      - name: Wait for PostgreSQL
-        run: sleep 5
-
-      - name: Install PostgreSQL client
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y postgresql-client
-
-      - name: Create todos table
-        run: |
-          PGPASSWORD=postgres psql -h localhost -U postgres -d todo -c "
-          CREATE TABLE IF NOT EXISTS todos (
-            id SERIAL PRIMARY KEY,
-            title TEXT NOT NULL,
-            completed BOOLEAN DEFAULT false,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-          );"
-
       - name: Run lint
         run: |
           cd backend
           npm run lint
 
-      - name: Run tests
+      - name: Run tests (Mock DB)
         run: |
           cd backend
           npm test

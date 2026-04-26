@@ -4,8 +4,7 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
-const { Pool } = require('pg');
-
+const pool = require('./db')
 const app = express();
 
 /* =========================
@@ -16,16 +15,6 @@ app.use(cors());
 app.use(express.json());
 app.use(morgan('dev'));
 
-/* =========================
-   DATABASE CONNECTION
-========================= */
-const pool = new Pool({
-  host: process.env.DB_HOST,
-  port: Number(process.env.DB_PORT) || 5432,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  database: process.env.DB_NAME,
-});
 
 /* =========================
    STATIC FRONTEND
