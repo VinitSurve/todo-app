@@ -5,7 +5,6 @@ const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const { Pool } = require('pg');
-const path = require('path');
 
 const app = express();
 
@@ -32,9 +31,8 @@ const pool = new Pool({
    STATIC FRONTEND
 ========================= */
 app.use(express.static('/var/www/html'));
-
 /* =========================
-   ROUTER (IMPORTANT FIX)
+   ROUTER
 ========================= */
 const router = express.Router();
 
@@ -42,29 +40,9 @@ const router = express.Router();
    ROUTES
 ========================= */
 
-router.put('/todos/:id', async (req, res) => {
-  const { id } = req.params;
-  const { title } = req.body;
-
-  if (title) {
-    const result = await pool.query(
-      'UPDATE todos SET title=$1 WHERE id=$2 RETURNING *',
-      [title, id]
-    );
-    return res.json(result.rows[0]);
-  }
-
-  const result = await pool.query(
-    'UPDATE todos SET completed = NOT completed WHERE id=$1 RETURNING *',
-    [id]
-  );
-
-  res.json(result.rows[0]);
-});
-
 // Health
 router.get('/health', (req, res) => {
-  res.json({
+  res.status(200).json({
     status: 'ok',
     service: 'backend',
     timestamp: new Date().toISOString(),
@@ -88,7 +66,7 @@ router.get('/todos', async (req, res) => {
     const result = await pool.query(
       'SELECT * FROM todos ORDER BY id DESC'
     );
-    res.json(result.rows);
+    res.status(200).json(result.rows);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to fetch todos' });
@@ -98,7 +76,7 @@ router.get('/todos', async (req, res) => {
 // ADD todo
 router.post('/todos', async (req, res) => {
   try {
-    console.log("BODY:", req.body); // DEBUG
+    console.log("BODY:", req.body);
 
     const { title } = req.body;
 
@@ -111,41 +89,65 @@ router.post('/todos', async (req, res) => {
       [title]
     );
 
-    res.json(result.rows[0]);
+    console.log("CREATED:", result.rows[0]);
+
+    // ✅ FIXED: proper status
+    res.status(201).json(result.rows[0]);
+
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to add todo' });
   }
 });
 
-// TOGGLE
+// UPDATE / TOGGLE todo
 router.put('/todos/:id', async (req, res) => {
   try {
     const { id } = req.params;
+    const { title } = req.body;
 
-    const result = await pool.query(
-      'UPDATE todos SET completed = NOT completed WHERE id = $1 RETURNING *',
-      [id]
-    );
+    if (!id || isNaN(id)) {
+      return res.status(400).json({ error: 'Invalid ID' });
+    }
 
-    res.json(result.rows[0]);
+    let result;
+
+    if (title) {
+      result = await pool.query(
+        'UPDATE todos SET title=$1 WHERE id=$2 RETURNING *',
+        [title, id]
+      );
+    } else {
+      result = await pool.query(
+        'UPDATE todos SET completed = NOT completed WHERE id=$1 RETURNING *',
+        [id]
+      );
+    }
+
+    res.status(200).json(result.rows[0]);
+
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to update todo' });
   }
 });
 
-// DELETE
+// DELETE todo
 router.delete('/todos/:id', async (req, res) => {
   try {
     const { id } = req.params;
+
+    if (!id || isNaN(id)) {
+      return res.status(400).json({ error: 'Invalid ID' });
+    }
 
     await pool.query(
       'DELETE FROM todos WHERE id = $1',
       [id]
     );
 
-    res.json({ success: true });
+    res.status(200).json({ success: true });
+
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to delete todo' });
@@ -160,8 +162,16 @@ app.use('/api', router);
 /* =========================
    SERVER START
 ========================= */
+
 const PORT = process.env.PORT || 3000;
 
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-});
+// ✅ Export app (for testing)
+module.exports = app;
+module.exports.pool = pool;
+
+// ✅ Start server only when run directly
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`🚀 Server running on port ${PORT}`);
+  });
+}
