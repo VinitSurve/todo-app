@@ -4,6 +4,7 @@
   "main": "index.js",
   "scripts": {
     "test": "NODE_ENV=test jest",
+    "test:integration": "NODE_ENV=integration jest",
     "lint": "eslint",
     "dev": "nodemon src/index.js",
     "start": "node src/index.js"

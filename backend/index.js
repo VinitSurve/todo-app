@@ -159,8 +159,7 @@ module.exports = app;
 module.exports.pool = pool;
 
 // ✅ Start server only when run directly
-if (require.main === module) {
   app.listen(PORT, () => {
     console.log(`🚀 Server running on port ${PORT}`);
   });
-}
+
